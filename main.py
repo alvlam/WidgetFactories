@@ -22,16 +22,12 @@ WHITE = (255, 255, 255)
 
 GROUND = DISPLAY_HEIGHT-100
 
-# load image files
+# Function to load image file and optional resize
 def load_image_file(fileName, resize=None):
     img = pygame.image.load(path.join(path.dirname(__file__), fileName))
     if resize is not None:
         img = pygame.transform.scale(img, resize)
     return img
-
-IMG_FACTORY = load_image_file("img/factory64px.png", (128,128))
-IMG_TRUCK = load_image_file("img/truck64px.png")
-# Icons made by <a href="https://www.flaticon.com/authors/nhor-phai" title="Nhor Phai">Nhor Phai</a> from <a href="https://www.flaticon.com/" title="Flaticon"> www.flaticon.com</a>
 
 #------ Sprite definitions ------------------------------
 class Truck(pygame.sprite.Sprite):
@@ -104,17 +100,19 @@ class Factory(pygame.sprite.Sprite):
         self.rect.topleft = location
     
     # based on https://stackoverflow.com/questions/60997970/how-to-add-a-text-speech-in-pygame
-    def sayHello(self, font : str, size : int, text : str, color, bold : bool):
-        font = pygame.font.SysFont(font, size)
+    def sayHello(self, text : str, color, bold : bool):
+        font = FONT_ARIAL
         font.set_bold(bold)
         textSurf = font.render(text, True, color, WHITE).convert_alpha()
         textSize = textSurf.get_size()   
         bubbleSurf = pygame.Surface((textSize[0]*2, textSize[1]*2))
         bubbleRect = bubbleSurf.get_rect()
-        pygame.draw.rect(bubbleSurf, color, bubbleRect, 1)
+        pygame.draw.rect(bubbleSurf, color, bubbleRect, 3)
         bubbleSurf.blit(textSurf, textSurf.get_rect(center = bubbleRect.center))
         bubbleRect.center = (self.rect.center[0], self.rect.center[1]-100)
         gameDisplay.blit(bubbleSurf, bubbleRect)
+
+
 
 # Initialize pygame
 pygame.init()
@@ -123,6 +121,13 @@ gameDisplay = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
 pygame.display.set_caption('Silly Inventions!')
 
 clock = pygame.time.Clock()
+
+# Load everthing
+IMG_FACTORY = load_image_file("factory64px.png", (128,128))
+IMG_TRUCK = load_image_file("truck64px.png")
+# Icons made by <a href="https://www.flaticon.com/authors/nhor-phai" title="Nhor Phai">Nhor Phai</a> from <a href="https://www.flaticon.com/" title="Flaticon"> www.flaticon.com</a>
+
+FONT_ARIAL = pygame.font.SysFont('Arial', 18)
 
 # Create the player
 truck = Truck(50)
@@ -175,7 +180,7 @@ while not done:
     collided_factories = pygame.sprite.spritecollide(truck,factories,False)
     for factory in collided_factories:
         # If so, then factory should say hello
-        factory.sayHello('Arial', 18, 'Hello!', BLACK, False)
+        factory.sayHello('Hello!', BLACK, False)
 
      # Update the display
     pygame.display.update()
