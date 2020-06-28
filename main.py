@@ -41,10 +41,10 @@ class Truck(pygame.sprite.Sprite):
         location = (locX, GROUND - self.image.get_height())
         self.rect.topleft = location
         self.pos = pygame.math.Vector2(location)
-        self.set_target(self.pos)
+        self.setTarget(self.pos)
         self.speed = speed
     
-    def set_direction(self, direction):
+    def setDirection(self, direction):
         if direction.upper() == "LEFT":
             if self.orientation == "RIGHT":
               self.image = pygame.transform.flip(self.image, True, False)
@@ -54,13 +54,13 @@ class Truck(pygame.sprite.Sprite):
               self.image = pygame.transform.flip(self.image, True, False)
             self.orientation = "RIGHT"
     
-    def set_target(self, pos):
+    def setTarget(self, pos):
         if pos[0] > 0 and pos[0] < DISPLAY_WIDTH: #and pos[1] > 0 and pos[1] < DISPLAY_HEIGHT:
             # set orientation and flip image if necessary
             if pos[0] < self.pos[0]:
-              self.set_direction("LEFT")
+              self.setDirection("LEFT")
             else:
-              self.set_direction("RIGHT")
+              self.setDirection("RIGHT")
             self.target = pygame.math.Vector2((pos[0], self.pos[1]))
         else:
             self.target = self.pos
@@ -68,11 +68,17 @@ class Truck(pygame.sprite.Sprite):
     def move(self, vector):
       # set orientation and flip image if necessary
       if vector[0] < 0:
-        self.set_direction("LEFT")
+        self.setDirection("LEFT")
       else:
-        self.set_direction("RIGHT")
-      self.set_target((self.rect.left+(vector[0]*self.speed),self.rect.top+(vector[1]*self.speed)))
+        self.setDirection("RIGHT")
+      self.setTarget((self.rect.left+(vector[0]*self.speed),self.rect.top+(vector[1]*self.speed)))
     
+    def changeSpeed(self, delta):
+        if delta < 0 and self.speed > 1:
+            self.speed += delta
+        elif delta > 0 and self.speed <= 10: # change to MAX_SPEED
+            self.speed += delta
+        
     def update(self):
         vector = self.target - self.pos
         move_length = vector.length()
@@ -89,10 +95,10 @@ class Truck(pygame.sprite.Sprite):
 
         self.rect.topleft = list(int(v) for v in self.pos)
 
-class Factory(pygame.sprite.Sprite):
-    def __init__(self, locX=0):
+class Building(pygame.sprite.Sprite):
+    def __init__(self, img, locX=0):
         pygame.sprite.Sprite.__init__(self)
-        self.image = IMG_FACTORY
+        self.image = img
         self.rect = self.image.get_rect()
         self.mask = pygame.mask.from_surface(self.image)
 
@@ -123,27 +129,26 @@ pygame.display.set_caption('Silly Inventions!')
 clock = pygame.time.Clock()
 
 # Load everthing
-IMG_FACTORY = load_image_file("factory64px.png", (128,128))
+IMG_FACTORY = load_image_file("factory512px.png", (128,128))
+IMG_SHOP = load_image_file("shop512px.png", (128,128))
 IMG_TRUCK = load_image_file("truck64px.png")
-# Icons made by <a href="https://www.flaticon.com/authors/nhor-phai" title="Nhor Phai">Nhor Phai</a> from <a href="https://www.flaticon.com/" title="Flaticon"> www.flaticon.com</a>
+# Icons made by https://www.flaticon.com/authors/nhor-phai
 
 FONT_ARIAL = pygame.font.SysFont('Arial', 18)
 
 # Create the player
 truck = Truck(50)
-factory1 = Factory(200)
 
-# Create groups to hold enemy sprites and all sprites
-# - factories is used for collision detection and position updates
-# - allSprites is used for rendering
-factories = pygame.sprite.Group()
-factories.add(factory1)
+# Create buildings group for collision detection and position updates
+buildings = pygame.sprite.Group()
+buildings.add(Building(IMG_FACTORY, 200))
+buildings.add(Building(IMG_SHOP, 600))
 
+# - Create allSprites group for rendering
 all_sprites = pygame.sprite.Group()
-for f in factories:
-    all_sprites.add(f)
-
-# truck on top of factories
+for b in buildings:
+    all_sprites.add(b)
+# truck on top of buildings
 all_sprites.add(truck)
 
 done = False
@@ -155,17 +160,29 @@ while not done:
         if e.type == pygame.QUIT:
             pygame.quit()
 
-    # check pressed keys and move the player around
+    # check pressed keys
     keys = pygame.key.get_pressed()
+
+    # q or escape to quit
+    if keys[pygame.K_ESCAPE] or keys[pygame.K_q]:
+        pygame.quit()
+
+    # left and right to move player
     if keys[pygame.K_LEFT]:
         truck.move((-1,0))
     elif keys[pygame.K_RIGHT]:
         truck.move((1,0))
     
+    # up and down to change speed
+    if keys[pygame.K_UP]:
+        truck.changeSpeed(1)
+    elif keys[pygame.K_DOWN]:
+        truck.changeSpeed(-1)
+    
     # checking pressed mouse and move the player around
     click = pygame.mouse.get_pressed()
     if click[0] == True: # evaluate left button
-        truck.set_target(pygame.mouse.get_pos())
+        truck.setTarget(pygame.mouse.get_pos())
     
     # Updates
     truck.update()
@@ -177,10 +194,10 @@ while not done:
     all_sprites.draw(gameDisplay)
 
     # Check if truck has collided with a factory
-    collided_factories = pygame.sprite.spritecollide(truck,factories,False)
-    for factory in collided_factories:
+    collided_buildings = pygame.sprite.spritecollide(truck,buildings,False)
+    for building in collided_buildings:
         # If so, then factory should say hello
-        factory.sayHello('Hello!', BLACK, False)
+        building.sayHello('Hello!', BLACK, False)
 
      # Update the display
     pygame.display.update()
