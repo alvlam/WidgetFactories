@@ -14,8 +14,8 @@ from pygame.locals import (
 )
 
 # Define globals
-DISPLAY_WIDTH = 800
-DISPLAY_HEIGHT = 600
+DISPLAY_WIDTH = 1200
+DISPLAY_HEIGHT = 400
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -31,12 +31,14 @@ def load_image_file(fileName, resize=None):
 
 #------ Sprite definitions ------------------------------
 class Truck(pygame.sprite.Sprite):
-    def __init__(self, locX=0, speed=1, orientation="RIGHT"):
+    def __init__(self, locX=0, speed=2, orientation="RIGHT"):
         pygame.sprite.Sprite.__init__(self)
         self.image = IMG_TRUCK
-        self.orientation = orientation
         self.rect = self.image.get_rect()
         self.mask = pygame.mask.from_surface(self.image)
+
+        self.orientation = "RIGHT" # source image is facing right
+        self.setDirection(orientation)
 
         location = (locX, GROUND - self.image.get_height())
         self.rect.topleft = location
@@ -59,7 +61,7 @@ class Truck(pygame.sprite.Sprite):
             # set orientation and flip image if necessary
             if pos[0] < self.pos[0]:
               self.setDirection("LEFT")
-            else:
+            elif pos[0] > self.pos[0]:
               self.setDirection("RIGHT")
             self.target = pygame.math.Vector2((pos[0], self.pos[1]))
         else:
@@ -137,7 +139,8 @@ IMG_TRUCK = load_image_file("truck64px.png")
 FONT_ARIAL = pygame.font.SysFont('Arial', 18)
 
 # Create the player
-truck = Truck(50)
+player1 = Truck(50)
+player2 = Truck(DISPLAY_WIDTH - IMG_TRUCK.get_width() - 50, orientation="LEFT")
 
 # Create buildings group for collision detection and position updates
 buildings = pygame.sprite.Group()
@@ -148,8 +151,9 @@ buildings.add(Building(IMG_SHOP, 600))
 all_sprites = pygame.sprite.Group()
 for b in buildings:
     all_sprites.add(b)
-# truck on top of buildings
-all_sprites.add(truck)
+# players on top of buildings
+all_sprites.add(player1)
+all_sprites.add(player2)
 
 done = False
 
@@ -167,25 +171,34 @@ while not done:
     if keys[pygame.K_ESCAPE] or keys[pygame.K_q]:
         pygame.quit()
 
-    # left and right to move player
+    # left and right to move player1
+    if keys[pygame.K_a]: # left
+        player1.move((-1,0))
+    elif keys[pygame.K_d]: # right
+        player1.move((1,0))
+
+    # left and right to move player2
     if keys[pygame.K_LEFT]:
-        truck.move((-1,0))
+        player2.move((-1,0))
     elif keys[pygame.K_RIGHT]:
-        truck.move((1,0))
+        player2.move((1,0))
     
     # up and down to change speed
     if keys[pygame.K_UP]:
-        truck.changeSpeed(1)
+        player1.changeSpeed(1)
+        player2.changeSpeed(1)
     elif keys[pygame.K_DOWN]:
-        truck.changeSpeed(-1)
+        player1.changeSpeed(-1)
+        player2.changeSpeed(-1)
     
     # checking pressed mouse and move the player around
     click = pygame.mouse.get_pressed()
     if click[0] == True: # evaluate left button
-        truck.setTarget(pygame.mouse.get_pos())
+        player1.setTarget(pygame.mouse.get_pos())
     
     # Updates
-    truck.update()
+    player1.update()
+    player2.update()
 
     # init background
     gameDisplay.fill(WHITE)
@@ -193,8 +206,12 @@ while not done:
 
     all_sprites.draw(gameDisplay)
 
-    # Check if truck has collided with a factory
-    collided_buildings = pygame.sprite.spritecollide(truck,buildings,False)
+    # Check if players have collided with a building
+    collided_buildings = pygame.sprite.spritecollide(player1,buildings,False)
+    for building in collided_buildings:
+        # If so, then factory should say hello
+        building.sayHello('Hello!', BLACK, False)
+    collided_buildings = pygame.sprite.spritecollide(player2,buildings,False)
     for building in collided_buildings:
         # If so, then factory should say hello
         building.sayHello('Hello!', BLACK, False)
