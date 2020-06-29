@@ -138,6 +138,9 @@ IMG_TRUCK = load_image_file("truck64px.png")
 
 FONT_ARIAL = pygame.font.SysFont('Arial', 18)
 
+# Create world surface?
+
+
 # Create the player
 player1 = Truck(50)
 player2 = Truck(DISPLAY_WIDTH - IMG_TRUCK.get_width() - 50, orientation="LEFT")
@@ -146,6 +149,7 @@ player2 = Truck(DISPLAY_WIDTH - IMG_TRUCK.get_width() - 50, orientation="LEFT")
 buildings = pygame.sprite.Group()
 buildings.add(Building(IMG_FACTORY, 200))
 buildings.add(Building(IMG_SHOP, 600))
+buildings.add(Building(IMG_FACTORY, DISPLAY_WIDTH - IMG_FACTORY.get_width() - 200,))
 
 # - Create allSprites group for rendering
 all_sprites = pygame.sprite.Group()
