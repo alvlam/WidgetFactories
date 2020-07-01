@@ -16,15 +16,6 @@ from pygame.locals import (
     QUIT,
 )
 
-# Define globals
-DISPLAY_WIDTH = 1200
-DISPLAY_HEIGHT = 400
-
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-
-GROUND = DISPLAY_HEIGHT-100
-
 # Function to load image file and optional resize
 def load_image_file(fileName, resize=None):
     img = pygame.image.load(path.join(path.dirname(__file__), fileName))
@@ -34,9 +25,9 @@ def load_image_file(fileName, resize=None):
 
 #------ Sprite definitions ------------------------------
 class Truck(pygame.sprite.Sprite):
-    def __init__(self, locX=0, speed=2, orientation="RIGHT"):
+    def __init__(self, img, locX=0, speed=2, orientation="RIGHT"):
         pygame.sprite.Sprite.__init__(self)
-        self.image = IMG_TRUCK
+        self.image = img
         self.rect = self.image.get_rect()
         self.mask = pygame.mask.from_surface(self.image)
 
@@ -60,7 +51,7 @@ class Truck(pygame.sprite.Sprite):
             self.orientation = "RIGHT"
     
     def setTarget(self, pos):
-        if pos[0] > 0 and pos[0] < DISPLAY_WIDTH: #and pos[1] > 0 and pos[1] < DISPLAY_HEIGHT:
+        if pos[0] > 0 and pos[0] < WORLD_WIDTH: #and pos[1] > 0 and pos[1] < DISPLAY_HEIGHT:
             # set orientation and flip image if necessary
             if pos[0] < self.pos[0]:
               self.setDirection("LEFT")
@@ -111,8 +102,7 @@ class Building(pygame.sprite.Sprite):
         self.rect.topleft = location
     
     # based on https://stackoverflow.com/questions/60997970/how-to-add-a-text-speech-in-pygame
-    def sayHello(self, text : str, color, bold : bool):
-        font = FONT_ARIAL
+    def say(self, text : str, font, color, bold : bool):
         font.set_bold(bold)
         textSurf = font.render(text, True, color, WHITE).convert_alpha()
         textSize = textSurf.get_size()   
@@ -121,108 +111,139 @@ class Building(pygame.sprite.Sprite):
         pygame.draw.rect(bubbleSurf, color, bubbleRect, 3)
         bubbleSurf.blit(textSurf, textSurf.get_rect(center = bubbleRect.center))
         bubbleRect.center = (self.rect.center[0], self.rect.center[1]-100)
-        gameDisplay.blit(bubbleSurf, bubbleRect)
+        world.blit(bubbleSurf, bubbleRect) # render to world, above the building
 
 
+def Main(gameDisplay, clock):
 
-gameDisplay = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
-pygame.display.set_caption('Silly Inventions!')
+    # Load everthing
+    # Icons made by https://www.flaticon.com/authors/nhor-phai
+    IMG_FACTORY = load_image_file("factory512px.png", (128,128))
+    IMG_SHOP = load_image_file("shop512px.png", (128,128))
+    IMG_TRUCK = load_image_file("truck64px.png")
 
-clock = pygame.time.Clock()
+    FONT_ARIAL = pygame.font.SysFont('Arial', 18)
 
-# Load everthing
-IMG_FACTORY = load_image_file("factory512px.png", (128,128))
-IMG_SHOP = load_image_file("shop512px.png", (128,128))
-IMG_TRUCK = load_image_file("truck64px.png")
-# Icons made by https://www.flaticon.com/authors/nhor-phai
+    global world
+    world = pygame.Surface((WORLD_WIDTH, WORLD_HEIGHT)) # Create world surface
+    
+    camera_pos = (0,0) # Create Camara Starting Position
+    
+    # Create buildings and add to group for rendering
+    buildings = pygame.sprite.Group()
+    buildings.add(Building(IMG_FACTORY, 200))
+    buildings.add(Building(IMG_SHOP, 600))
+    buildings.add(Building(IMG_SHOP, 1200))
+    buildings.add(Building(IMG_FACTORY, WORLD_WIDTH - IMG_FACTORY.get_width() - 200,))
 
-FONT_ARIAL = pygame.font.SysFont('Arial', 18)
+    # Create the players
+    player1 = Truck(IMG_TRUCK, 50)
+    player2 = Truck(IMG_TRUCK, DISPLAY_WIDTH - IMG_TRUCK.get_width() - 50, orientation="LEFT") # player2 starts from right
+    # add to separate group for rendering
+    players = pygame.sprite.Group()
+    players.add(player1, player2)
 
-# Create world surface?
+    done = False
 
+    # Main loop
+    while not done:
+        clock.tick(FPS)
 
-# Create the player
-player1 = Truck(50)
-player2 = Truck(DISPLAY_WIDTH - IMG_TRUCK.get_width() - 50, orientation="LEFT")
+        # Look at every event in the queue
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
 
-# Create buildings group for collision detection and position updates
-buildings = pygame.sprite.Group()
-buildings.add(Building(IMG_FACTORY, 200))
-buildings.add(Building(IMG_SHOP, 600))
-buildings.add(Building(IMG_FACTORY, DISPLAY_WIDTH - IMG_FACTORY.get_width() - 200,))
+        # check pressed keys
+        keys = pygame.key.get_pressed()
 
-# - Create allSprites group for rendering
-all_sprites = pygame.sprite.Group()
-for b in buildings:
-    all_sprites.add(b)
-# players on top of buildings
-all_sprites.add(player1)
-all_sprites.add(player2)
-
-done = False
-
-# Main loop
-while not done:
-    # Look at every event in the queue
-    for e in pygame.event.get():
-        if e.type == pygame.QUIT:
+        # q or escape to quit
+        if keys[pygame.K_ESCAPE] or keys[pygame.K_q]:
             pygame.quit()
 
-    # check pressed keys
-    keys = pygame.key.get_pressed()
+        # player1: left and right to move
+        if keys[pygame.K_a]: # left
+            player1.move((-1,0))
+        elif keys[pygame.K_d]: # right
+            player1.move((1,0))
 
-    # q or escape to quit
-    if keys[pygame.K_ESCAPE] or keys[pygame.K_q]:
-        pygame.quit()
+        # player1: W and S to change speed
+        if keys[pygame.K_w]:
+            player1.changeSpeed(1)
+        elif keys[pygame.K_s]:
+            player1.changeSpeed(-1)
 
-    # left and right to move player1
-    if keys[pygame.K_a]: # left
-        player1.move((-1,0))
-    elif keys[pygame.K_d]: # right
-        player1.move((1,0))
+        # player2: left and right to move
+        if keys[pygame.K_LEFT]:
+            player2.move((-1,0))
+        elif keys[pygame.K_RIGHT]:
+            player2.move((1,0))
+        
+        # player2: up and down to change speed
+        if keys[pygame.K_UP]:
+            player2.changeSpeed(1)
+        elif keys[pygame.K_DOWN]:
+            player2.changeSpeed(-1)
+        
+        # checking pressed mouse and move the player around
+        click = pygame.mouse.get_pressed()
+        if click[0] == True: # evaluate left button
+            player1.setTarget(pygame.mouse.get_pos())
+        
+        # Updates
+        player1.update()
+        #camera_pos = player1.update(camera_pos) # update player1 and return new camera pos
+        player2.update()
 
-    # left and right to move player2
-    if keys[pygame.K_LEFT]:
-        player2.move((-1,0))
-    elif keys[pygame.K_RIGHT]:
-        player2.move((1,0))
+        # render to world surface
+        world.fill(WHITE)
+        pygame.draw.line(world, BLACK, (0, GROUND), (DISPLAY_WIDTH, GROUND), 5) # draw the ground
+        buildings.draw(world)
+        players.draw(world)
+
+        # Check if players have collided with buildings
+        for player in players:
+            collided_buildings = pygame.sprite.spritecollide(player, buildings, False)
+            for building in collided_buildings:
+                # If so, then factory should say hello
+                building.say('Hello!', FONT_ARIAL, BLACK, False)
+
+        # Render world to gameDisplay, at current camera position
+        gameDisplay.fill(WHITE) # fill the background white to avoid smearing
+        gameDisplay.blit(world, camera_pos)
+        
+        # Update the display
+        pygame.display.flip()
+
+    pygame.quit()
+    quit()
+
+
+if __name__ in "__main__":
     
-    # up and down to change speed
-    if keys[pygame.K_UP]:
-        player1.changeSpeed(1)
-        player2.changeSpeed(1)
-    elif keys[pygame.K_DOWN]:
-        player1.changeSpeed(-1)
-        player2.changeSpeed(-1)
-    
-    # checking pressed mouse and move the player around
-    click = pygame.mouse.get_pressed()
-    if click[0] == True: # evaluate left button
-        player1.setTarget(pygame.mouse.get_pos())
-    
-    # Updates
-    player1.update()
-    player2.update()
+    # Define globals
+    global FPS # for clock
+    FPS = 60
 
-    # init background
-    gameDisplay.fill(WHITE)
-    pygame.draw.line(gameDisplay, BLACK, (0, GROUND), (DISPLAY_WIDTH, GROUND), 5)    
+    global WHITE, RED, GREEN, BLUE, BLACK # colours
+    WHITE = (255, 255, 255)
+    RED = (255, 0, 0)
+    GREEN = (0, 255, 0)
+    BLUE = (0, 0, 255)
+    BLACK = (0, 0, 0)
 
-    all_sprites.draw(gameDisplay)
+    global DISPLAY_WIDTH, DISPLAY_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT # screen and world sizes
+    DISPLAY_WIDTH = 1200
+    DISPLAY_HEIGHT = 400
+    WORLD_WIDTH = 2000
+    WORLD_HEIGHT = 400
 
-    # Check if players have collided with a building
-    collided_buildings = pygame.sprite.spritecollide(player1,buildings,False)
-    for building in collided_buildings:
-        # If so, then factory should say hello
-        building.sayHello('Hello!', BLACK, False)
-    collided_buildings = pygame.sprite.spritecollide(player2,buildings,False)
-    for building in collided_buildings:
-        # If so, then factory should say hello
-        building.sayHello('Hello!', BLACK, False)
+    global GROUND # ground height
+    GROUND = DISPLAY_HEIGHT-100
 
-     # Update the display
-    pygame.display.update()
-    clock.tick(60)
+    gameDisplay = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
+    pygame.display.set_caption("Silly Inventions!")
+    clock = pygame.time.Clock()
 
-pygame.quit()
-quit()
+    # Run Main Loop
+    Main(gameDisplay, clock)
