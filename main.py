@@ -1,6 +1,9 @@
 from os import path
 import pygame
 
+# Initialize pygame
+pygame.init()
+
 # Import pygame.locals for easier access to key coordinates
 # Updated to conform to flake8 and black standards
 from pygame.locals import (
@@ -121,9 +124,6 @@ class Building(pygame.sprite.Sprite):
         gameDisplay.blit(bubbleSurf, bubbleRect)
 
 
-
-# Initialize pygame
-pygame.init()
 
 gameDisplay = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
 pygame.display.set_caption('Silly Inventions!')
