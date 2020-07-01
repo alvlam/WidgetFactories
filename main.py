@@ -75,7 +75,7 @@ class Truck(pygame.sprite.Sprite):
         elif delta > 0 and self.speed <= 10: # change to MAX_SPEED
             self.speed += delta
         
-    def update(self):
+    def update(self, cam):
         vector = self.target - self.pos
         move_length = vector.length()
 
@@ -90,6 +90,12 @@ class Truck(pygame.sprite.Sprite):
             self.autoMoving = False
 
         self.rect.topleft = list(int(v) for v in self.pos)
+
+        if (self.rect.center[0] >= cam[0] + DISPLAY_WIDTH/2 - 100) and \
+            (self.rect.center[0] <= cam[0] + DISPLAY_WIDTH/2 + 100):
+            return cam - vector
+        else:
+            return cam
 
 class Building(pygame.sprite.Sprite):
     def __init__(self, img, locX=0):
@@ -118,27 +124,27 @@ def Main(gameDisplay, clock):
 
     # Load everthing
     # Icons made by https://www.flaticon.com/authors/nhor-phai
-    IMG_FACTORY = load_image_file("factory512px.png", (128,128))
-    IMG_SHOP = load_image_file("shop512px.png", (128,128))
-    IMG_TRUCK = load_image_file("truck64px.png")
+    img_factory = load_image_file("factory512px.png", (128,128))
+    img_shop = load_image_file("shop512px.png", (128,128))
+    img_truck = load_image_file("truck64px.png")
 
-    FONT_ARIAL = pygame.font.SysFont('Arial', 18)
+    font_arial = pygame.font.SysFont('Arial', 18)
 
-    global world
+    # Set up world surface and camera pos
+    global world, camera
     world = pygame.Surface((WORLD_WIDTH, WORLD_HEIGHT)) # Create world surface
-    
-    camera_pos = (0,0) # Create Camara Starting Position
+    camera = (0,0) # Create Camara Starting Position
     
     # Create buildings and add to group for rendering
     buildings = pygame.sprite.Group()
-    buildings.add(Building(IMG_FACTORY, 200))
-    buildings.add(Building(IMG_SHOP, 600))
-    buildings.add(Building(IMG_SHOP, 1200))
-    buildings.add(Building(IMG_FACTORY, WORLD_WIDTH - IMG_FACTORY.get_width() - 200,))
+    buildings.add(Building(img_factory, 200))
+    buildings.add(Building(img_shop, 600))
+    buildings.add(Building(img_shop, 1200))
+    buildings.add(Building(img_factory, WORLD_WIDTH - img_factory.get_width() - 200,))
 
     # Create the players
-    player1 = Truck(IMG_TRUCK, 50)
-    player2 = Truck(IMG_TRUCK, DISPLAY_WIDTH - IMG_TRUCK.get_width() - 50, orientation="LEFT") # player2 starts from right
+    player1 = Truck(img_truck, 50)
+    player2 = Truck(img_truck, DISPLAY_WIDTH - img_truck.get_width() - 50, orientation="LEFT") # player2 starts from right
     # add to separate group for rendering
     players = pygame.sprite.Group()
     players.add(player1, player2)
@@ -191,13 +197,12 @@ def Main(gameDisplay, clock):
             player1.setTarget(pygame.mouse.get_pos())
         
         # Updates
-        player1.update()
-        #camera_pos = player1.update(camera_pos) # update player1 and return new camera pos
-        player2.update()
+        camera = player1.update(camera) # update player1 and camera_pos
+        camera = player2.update(camera) # update player2 and camera_pos
 
         # render to world surface
         world.fill(WHITE)
-        pygame.draw.line(world, BLACK, (0, GROUND), (DISPLAY_WIDTH, GROUND), 5) # draw the ground
+        pygame.draw.line(world, BLACK, (0, GROUND), (WORLD_WIDTH, GROUND), 5) # draw the ground
         buildings.draw(world)
         players.draw(world)
 
@@ -206,11 +211,11 @@ def Main(gameDisplay, clock):
             collided_buildings = pygame.sprite.spritecollide(player, buildings, False)
             for building in collided_buildings:
                 # If so, then factory should say hello
-                building.say('Hello!', FONT_ARIAL, BLACK, False)
+                building.say('Hello!', font_arial, BLACK, False)
 
         # Render world to gameDisplay, at current camera position
         gameDisplay.fill(WHITE) # fill the background white to avoid smearing
-        gameDisplay.blit(world, camera_pos)
+        gameDisplay.blit(world, camera)
         
         # Update the display
         pygame.display.flip()
@@ -233,13 +238,13 @@ if __name__ in "__main__":
     BLACK = (0, 0, 0)
 
     global DISPLAY_WIDTH, DISPLAY_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT # screen and world sizes
-    DISPLAY_WIDTH = 1200
+    DISPLAY_WIDTH = 800
     DISPLAY_HEIGHT = 400
     WORLD_WIDTH = 2000
     WORLD_HEIGHT = 400
 
-    global GROUND # ground height
-    GROUND = DISPLAY_HEIGHT-100
+    global GROUND
+    GROUND = DISPLAY_HEIGHT-100 # ground height
 
     gameDisplay = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
     pygame.display.set_caption("Silly Inventions!")
