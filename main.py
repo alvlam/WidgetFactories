@@ -219,7 +219,7 @@ def Main(gameDisplay, clock):
         gameDisplay.fill(WHITE) # fill the background white to avoid smearing
         gameDisplay.blit(world, (0,0), pygame.Rect(camera[0],camera[1],DISPLAY_WIDTH,DISPLAY_HEIGHT))
         
-        draw_text_box(gameDisplay, "camera: "+str(camera), FONT_ARIAL, BLACK, False, (int(DISPLAY_WIDTH/2), 20))
+        # draw_text_box(gameDisplay, "camera: "+str(camera), FONT_ARIAL, BLACK, False, (int(DISPLAY_WIDTH/2), 20))
 
         # Update the display
         pygame.display.flip()
