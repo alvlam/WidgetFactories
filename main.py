@@ -16,12 +16,27 @@ from pygame.locals import (
     QUIT,
 )
 
+#------ Function definitions ------------------------------
+
 # Function to load image file and optional resize
 def load_image_file(fileName, resize=None):
     img = pygame.image.load(path.join(path.dirname(__file__), fileName))
     if resize is not None:
         img = pygame.transform.scale(img, resize)
     return img
+
+# Function to draw a text box
+# based on https://stackoverflow.com/questions/60997970/how-to-add-a-text-speech-in-pygame
+def draw_text_box(surf, text, font, color, bold : bool, loc):
+    font.set_bold(bold)
+    textSurf = font.render(text, True, color, WHITE).convert_alpha()
+    textSize = textSurf.get_size()   
+    bubbleSurf = pygame.Surface((textSize[0]*2, textSize[1]*2))
+    bubbleRect = bubbleSurf.get_rect()
+    pygame.draw.rect(bubbleSurf, color, bubbleRect, 3)
+    bubbleSurf.blit(textSurf, textSurf.get_rect(center = bubbleRect.center))
+    bubbleRect.center = loc
+    surf.blit(bubbleSurf, bubbleRect) # render to surf
 
 #------ Sprite definitions ------------------------------
 class Truck(pygame.sprite.Sprite):
@@ -40,6 +55,8 @@ class Truck(pygame.sprite.Sprite):
         self.setTarget(self.pos)
         self.speed = speed
     
+        self.autoMoving = False
+
     def setDirection(self, direction):
         if direction.upper() == "LEFT":
             if self.orientation == "RIGHT":
@@ -91,9 +108,9 @@ class Truck(pygame.sprite.Sprite):
 
         self.rect.topleft = list(int(v) for v in self.pos)
 
-        if (self.rect.center[0] >= cam[0] + DISPLAY_WIDTH/2 - 100) and \
-            (self.rect.center[0] <= cam[0] + DISPLAY_WIDTH/2 + 100):
-            return cam - vector
+        if (self.pos[0] > (DISPLAY_WIDTH/2)) \
+            and (self.pos[0] < (WORLD_WIDTH - DISPLAY_WIDTH/2)): # player is away from edges of world
+            return (int(self.pos[0] - DISPLAY_WIDTH/2), cam[1]) # keep camera centered on player
         else:
             return cam
 
@@ -107,44 +124,29 @@ class Building(pygame.sprite.Sprite):
         location = (locX, GROUND - self.image.get_height())
         self.rect.topleft = location
     
-    # based on https://stackoverflow.com/questions/60997970/how-to-add-a-text-speech-in-pygame
-    def say(self, text : str, font, color, bold : bool):
-        font.set_bold(bold)
-        textSurf = font.render(text, True, color, WHITE).convert_alpha()
-        textSize = textSurf.get_size()   
-        bubbleSurf = pygame.Surface((textSize[0]*2, textSize[1]*2))
-        bubbleRect = bubbleSurf.get_rect()
-        pygame.draw.rect(bubbleSurf, color, bubbleRect, 3)
-        bubbleSurf.blit(textSurf, textSurf.get_rect(center = bubbleRect.center))
-        bubbleRect.center = (self.rect.center[0], self.rect.center[1]-100)
-        world.blit(bubbleSurf, bubbleRect) # render to world, above the building
+    # draw text box above building
+    def say(self, text : str):
+        aboveBuilding = (self.rect.center[0], self.rect.center[1]-100)
+        draw_text_box(world, text, FONT_ARIAL, BLACK, False, aboveBuilding)
 
 
 def Main(gameDisplay, clock):
 
-    # Load everthing
-    # Icons made by https://www.flaticon.com/authors/nhor-phai
-    img_factory = load_image_file("factory512px.png", (128,128))
-    img_shop = load_image_file("shop512px.png", (128,128))
-    img_truck = load_image_file("truck64px.png")
-
-    font_arial = pygame.font.SysFont('Arial', 18)
-
     # Set up world surface and camera pos
-    global world, camera
+    global world
     world = pygame.Surface((WORLD_WIDTH, WORLD_HEIGHT)) # Create world surface
-    camera = (0,0) # Create Camara Starting Position
+    camera = (0,0) # Create Camara Starting Position (center of display)
     
     # Create buildings and add to group for rendering
     buildings = pygame.sprite.Group()
-    buildings.add(Building(img_factory, 200))
-    buildings.add(Building(img_shop, 600))
-    buildings.add(Building(img_shop, 1200))
-    buildings.add(Building(img_factory, WORLD_WIDTH - img_factory.get_width() - 200,))
+    buildings.add(Building(IMG_FACTORY, 200))
+    buildings.add(Building(IMG_SHOP, 600))
+    buildings.add(Building(IMG_SHOP, 1200))
+    buildings.add(Building(IMG_FACTORY, WORLD_WIDTH - IMG_FACTORY.get_width() - 200))
 
     # Create the players
-    player1 = Truck(img_truck, 50)
-    player2 = Truck(img_truck, DISPLAY_WIDTH - img_truck.get_width() - 50, orientation="LEFT") # player2 starts from right
+    player1 = Truck(IMG_TRUCK, 50)
+    player2 = Truck(IMG_TRUCK, DISPLAY_WIDTH - IMG_TRUCK.get_width() - 50, orientation="LEFT") # player2 starts from right
     # add to separate group for rendering
     players = pygame.sprite.Group()
     players.add(player1, player2)
@@ -198,7 +200,7 @@ def Main(gameDisplay, clock):
         
         # Updates
         camera = player1.update(camera) # update player1 and camera_pos
-        camera = player2.update(camera) # update player2 and camera_pos
+        player2.update(camera) # update player2 and camera_pos
 
         # render to world surface
         world.fill(WHITE)
@@ -211,12 +213,14 @@ def Main(gameDisplay, clock):
             collided_buildings = pygame.sprite.spritecollide(player, buildings, False)
             for building in collided_buildings:
                 # If so, then factory should say hello
-                building.say('Hello!', font_arial, BLACK, False)
+                building.say('Hello!')
 
         # Render world to gameDisplay, at current camera position
         gameDisplay.fill(WHITE) # fill the background white to avoid smearing
-        gameDisplay.blit(world, camera)
+        gameDisplay.blit(world, (0,0), pygame.Rect(camera[0],camera[1],DISPLAY_WIDTH,DISPLAY_HEIGHT))
         
+        draw_text_box(gameDisplay, "camera: "+str(camera), FONT_ARIAL, BLACK, False, (int(DISPLAY_WIDTH/2), 20))
+
         # Update the display
         pygame.display.flip()
 
@@ -245,6 +249,16 @@ if __name__ in "__main__":
 
     global GROUND
     GROUND = DISPLAY_HEIGHT-100 # ground height
+
+    # Load everthing
+    global IMG_FACTORY, IMG_SHOP, IMG_TRUCK
+    # Icons made by https://www.flaticon.com/authors/nhor-phai
+    IMG_FACTORY = load_image_file("factory512px.png", (128,128))
+    IMG_SHOP = load_image_file("shop512px.png", (128,128))
+    IMG_TRUCK = load_image_file("truck64px.png")
+
+    global FONT_ARIAL
+    FONT_ARIAL = pygame.font.SysFont('Arial', 18)
 
     gameDisplay = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
     pygame.display.set_caption("Silly Inventions!")
