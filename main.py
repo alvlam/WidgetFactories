@@ -69,7 +69,7 @@ class Truck(pygame.sprite.Sprite):
             self.orientation = "RIGHT"
     
     def setTarget(self, pos):
-        if pos[0] > 0 and pos[0] < WORLD_WIDTH: #and pos[1] > 0 and pos[1] < DISPLAY_HEIGHT:
+        if pos[0] > 0 and pos[0] < (WORLD_WIDTH - self.image.get_width()): #and pos[1] > 0 and pos[1] < DISPLAY_HEIGHT:
             # set orientation and flip image if necessary
             if pos[0] < self.pos[0]:
               self.setDirection("LEFT")
@@ -136,11 +136,11 @@ class Building(pygame.sprite.Sprite):
 def Main(gameDisplay, clock):
 
     # Set up world surface and camera pos
-    global world
+    global world, splitScreen
     world = pygame.Surface((WORLD_WIDTH, WORLD_HEIGHT)) # Create world surface
+    splitScreen = True # joint screen when players come together
     cam1 = (0,0) # player1 camara starting position
     cam2 = (WORLD_WIDTH-DISPLAY_WIDTH/2,0) # player2 camara starting position
-    splitScreen = True
     
     # Create buildings and add to group for rendering
     buildings = pygame.sprite.Group()
@@ -219,6 +219,12 @@ def Main(gameDisplay, clock):
             for building in collided_buildings:
                 # If so, then factory should say hello
                 building.say('Hello!')
+
+        # update split/joint screen
+        if splitScreen and abs(cam1[0]-cam2[0]) <= DISPLAY_WIDTH:
+            splitScreen = False # players have come together
+        elif abs(player1.pos[0]-player2.pos[0]) > DISPLAY_WIDTH:
+            splitScreen = True # players moved apart
 
         # Render world to gameDisplay, at current camera position
         gameDisplay.fill(WHITE) # fill the background white to avoid smearing
