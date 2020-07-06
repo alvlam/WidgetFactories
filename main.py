@@ -41,11 +41,18 @@ def draw_text_box(surf, text, font, color, bold : bool, loc):
 
 #------ Sprite definitions ------------------------------
 class Truck(pygame.sprite.Sprite):
-    def __init__(self, img, locX=0, speed=2, orientation="RIGHT"):
+    def __init__(self, img, locX=0, speed=2, orientation="RIGHT", colour=None):
         pygame.sprite.Sprite.__init__(self)
-        self.image = img
+        
+        self.image = load_image_file(img)
         self.rect = self.image.get_rect()
-        self.mask = pygame.mask.from_surface(self.image)
+
+        if colour is not None:
+            colourImage = pygame.Surface(self.image.get_size()).convert_alpha()
+            colourImage.fill(colour)
+            self.image.blit(colourImage, (0,0), special_flags = pygame.BLEND_RGBA_MULT)
+
+        #self.mask = pygame.mask.from_surface(self.image)
 
         self.orientation = "RIGHT" # source image is facing right
         self.setDirection(orientation)
@@ -150,8 +157,9 @@ def Main(gameDisplay, clock):
     buildings.add(Building(IMG_FACTORY, WORLD_WIDTH - IMG_FACTORY.get_width() - 200))
 
     # Create the players
-    player1 = Truck(IMG_TRUCK, 50)
-    player2 = Truck(IMG_TRUCK, WORLD_WIDTH - IMG_TRUCK.get_width() - 50, orientation="LEFT") # player2 starts from right
+    truck_filename = "truck64px.png"
+    player1 = Truck(truck_filename, 50, colour=ORANGE)
+    player2 = Truck(truck_filename, WORLD_WIDTH - 100, orientation="LEFT", colour = BLUE) # player2 starts from right
     # add to separate group for rendering
     players = pygame.sprite.Group()
     players.add(player1, player2)
@@ -256,6 +264,7 @@ if __name__ in "__main__":
     GREEN = (0, 255, 0)
     BLUE = (0, 0, 255)
     BLACK = (0, 0, 0)
+    ORANGE = pygame.Color('sienna2')
 
     global DISPLAY_WIDTH, DISPLAY_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT # screen and world sizes
     DISPLAY_WIDTH = 800
@@ -271,7 +280,7 @@ if __name__ in "__main__":
     # Icons made by https://www.flaticon.com/authors/nhor-phai
     IMG_FACTORY = load_image_file("factory512px.png", (128,128))
     IMG_SHOP = load_image_file("shop512px.png", (128,128))
-    IMG_TRUCK = load_image_file("truck64px.png")
+    #IMG_TRUCK = load_image_file("truck64px.png")
 
     global FONT_ARIAL
     FONT_ARIAL = pygame.font.SysFont('Arial', 18)
