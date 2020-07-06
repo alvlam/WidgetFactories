@@ -32,6 +32,7 @@ def draw_text_box(surf, text, font, color, bold : bool, loc):
     textSurf = font.render(text, True, color, WHITE).convert_alpha()
     textSize = textSurf.get_size()   
     bubbleSurf = pygame.Surface((textSize[0]*2, textSize[1]*2))
+    bubbleSurf.fill(WHITE)
     bubbleRect = bubbleSurf.get_rect()
     pygame.draw.rect(bubbleSurf, color, bubbleRect, 3)
     bubbleSurf.blit(textSurf, textSurf.get_rect(center = bubbleRect.center))
@@ -108,11 +109,13 @@ class Truck(pygame.sprite.Sprite):
 
         self.rect.topleft = list(int(v) for v in self.pos)
 
-        if (self.pos[0] > (DISPLAY_WIDTH/2)) \
-            and (self.pos[0] < (WORLD_WIDTH - DISPLAY_WIDTH/2)): # player is away from edges of world
-            return (int(self.pos[0] - DISPLAY_WIDTH/2), cam[1]) # keep camera centered on player
-        else:
-            return cam
+        if (self.pos[0] >= (DISPLAY_WIDTH/4)) \
+            and (self.pos[0] <= (WORLD_WIDTH - DISPLAY_WIDTH/4)): # player is away from edges of world
+            return (int(self.pos[0] - DISPLAY_WIDTH/4), cam[1]) # keep camera centered on player
+        elif (self.pos[0] < (DISPLAY_WIDTH/4)): # is at left side of world
+            return (0,0)
+        else: # is at right side of world
+            return (WORLD_WIDTH - DISPLAY_WIDTH/2, cam[1])
 
 class Building(pygame.sprite.Sprite):
     def __init__(self, img, locX=0):
@@ -135,7 +138,9 @@ def Main(gameDisplay, clock):
     # Set up world surface and camera pos
     global world
     world = pygame.Surface((WORLD_WIDTH, WORLD_HEIGHT)) # Create world surface
-    camera = (0,0) # Create Camara Starting Position (center of display)
+    cam1 = (0,0) # player1 camara starting position
+    cam2 = (WORLD_WIDTH-DISPLAY_WIDTH/2,0) # player2 camara starting position
+    splitScreen = True
     
     # Create buildings and add to group for rendering
     buildings = pygame.sprite.Group()
@@ -146,7 +151,7 @@ def Main(gameDisplay, clock):
 
     # Create the players
     player1 = Truck(IMG_TRUCK, 50)
-    player2 = Truck(IMG_TRUCK, DISPLAY_WIDTH - IMG_TRUCK.get_width() - 50, orientation="LEFT") # player2 starts from right
+    player2 = Truck(IMG_TRUCK, WORLD_WIDTH - IMG_TRUCK.get_width() - 50, orientation="LEFT") # player2 starts from right
     # add to separate group for rendering
     players = pygame.sprite.Group()
     players.add(player1, player2)
@@ -194,13 +199,13 @@ def Main(gameDisplay, clock):
             player2.changeSpeed(-1)
         
         # checking pressed mouse and move the player around
-        click = pygame.mouse.get_pressed()
-        if click[0] == True: # evaluate left button
-            player1.setTarget(pygame.mouse.get_pos())
+        #click = pygame.mouse.get_pressed()
+        #if click[0] == True: # evaluate left button
+        #    player1.setTarget(pygame.mouse.get_pos())
         
         # Updates
-        camera = player1.update(camera) # update player1 and camera_pos
-        player2.update(camera) # update player2 and camera_pos
+        cam1 = player1.update(cam1) # update player1 and camera_pos
+        cam2 = player2.update(cam2) # update player2 and camera_pos
 
         # render to world surface
         world.fill(WHITE)
@@ -217,7 +222,12 @@ def Main(gameDisplay, clock):
 
         # Render world to gameDisplay, at current camera position
         gameDisplay.fill(WHITE) # fill the background white to avoid smearing
-        gameDisplay.blit(world, (0,0), pygame.Rect(camera[0],camera[1],DISPLAY_WIDTH,DISPLAY_HEIGHT))
+        if splitScreen:
+            gameDisplay.blit(world, (0,0), pygame.Rect(cam1[0],cam1[1],int(DISPLAY_WIDTH/2),DISPLAY_HEIGHT))
+            gameDisplay.blit(world, (DISPLAY_WIDTH/2,0), pygame.Rect(cam2[0],cam2[1],int(DISPLAY_WIDTH/2),DISPLAY_HEIGHT))
+            pygame.draw.line(gameDisplay, BLACK, (int(DISPLAY_WIDTH/2), 0), (int(DISPLAY_WIDTH/2), DISPLAY_HEIGHT), 10)
+        else:
+            gameDisplay.blit(world, (0,0), pygame.Rect(cam1[0],cam1[1],DISPLAY_WIDTH,DISPLAY_HEIGHT))
         
         # draw_text_box(gameDisplay, "camera: "+str(camera), FONT_ARIAL, BLACK, False, (int(DISPLAY_WIDTH/2), 20))
 
