@@ -27,7 +27,7 @@ def load_image_file(fileName, resize=None):
 
 # Function to draw a text box
 # based on https://stackoverflow.com/questions/60997970/how-to-add-a-text-speech-in-pygame
-def draw_text_box(surf, text, font, color, bold : bool, loc):
+def draw_text_box(surf, text, font, color, bold, loc):
     font.set_bold(bold)
     textSurf = font.render(text, True, color, WHITE).convert_alpha()
     textSize = textSurf.get_size()   
@@ -100,7 +100,7 @@ class Truck(pygame.sprite.Sprite):
         elif delta > 0 and self.speed <= 10: # change to MAX_SPEED
             self.speed += delta
         
-    def update(self, cam):
+    def update(self, cam, split):
         vector = self.target - self.pos
         move_length = vector.length()
 
@@ -116,13 +116,22 @@ class Truck(pygame.sprite.Sprite):
 
         self.rect.topleft = list(int(v) for v in self.pos)
 
-        if (self.pos[0] >= (DISPLAY_WIDTH/4)) \
-            and (self.pos[0] <= (WORLD_WIDTH - DISPLAY_WIDTH/4)): # player is away from edges of world
-            return (int(self.pos[0] - DISPLAY_WIDTH/4), cam[1]) # keep camera centered on player
-        elif (self.pos[0] < (DISPLAY_WIDTH/4)): # is at left side of world
-            return (0,0)
-        else: # is at right side of world
-            return (WORLD_WIDTH - DISPLAY_WIDTH/2, cam[1])
+        if split:
+            if (self.pos[0] + self.image.get_width() >= (DISPLAY_WIDTH/4)) \
+                and (self.pos[0] <= (WORLD_WIDTH - DISPLAY_WIDTH/4)): # player is away from edges of world
+                return (int(self.pos[0] + self.image.get_width()/2 - DISPLAY_WIDTH/4), cam[1]) # keep camera centered on player
+            elif (self.pos[0] < (DISPLAY_WIDTH/4)): # is at left side of world
+                return (0,0)
+            else: # is at right side of world
+                return (WORLD_WIDTH - DISPLAY_WIDTH/2, cam[1])
+        else: # not split
+            if (self.pos[0] + self.image.get_width() >= (DISPLAY_WIDTH/4)) \
+                and (self.pos[0] <= (WORLD_WIDTH - 3*DISPLAY_WIDTH/4)): # player is away from edges of world
+                return (int(self.pos[0] + self.image.get_width()/2 - DISPLAY_WIDTH/4), cam[1]) # keep camera centered on player
+            elif (self.pos[0] < (DISPLAY_WIDTH/4)): # is at left side of world
+                return (0,0)
+            else: # is at right side of world
+                return (WORLD_WIDTH - DISPLAY_WIDTH, cam[1])
 
 class Building(pygame.sprite.Sprite):
     def __init__(self, img, locX=0):
@@ -143,9 +152,9 @@ class Building(pygame.sprite.Sprite):
 def Main(gameDisplay, clock):
 
     # Set up world surface and camera pos
-    global world, splitScreen
+    global world, isSplitScreen
     world = pygame.Surface((WORLD_WIDTH, WORLD_HEIGHT)) # Create world surface
-    splitScreen = True # joint screen when players come together
+    isSplitScreen = True # joint screen when players come together
     cam1 = (0,0) # player1 camara starting position
     cam2 = (WORLD_WIDTH-DISPLAY_WIDTH/2,0) # player2 camara starting position
     
@@ -212,8 +221,8 @@ def Main(gameDisplay, clock):
         #    player1.setTarget(pygame.mouse.get_pos())
         
         # Updates
-        cam1 = player1.update(cam1) # update player1 and camera_pos
-        cam2 = player2.update(cam2) # update player2 and camera_pos
+        cam1 = player1.update(cam1, isSplitScreen) # update player1 and camera_pos
+        cam2 = player2.update(cam2, isSplitScreen) # update player2 and camera_pos
 
         # render to world surface
         world.fill(WHITE)
@@ -229,18 +238,20 @@ def Main(gameDisplay, clock):
                 building.say('Hello!')
 
         # update split/joint screen
-        if splitScreen and abs(cam1[0]-cam2[0]) <= DISPLAY_WIDTH:
-            splitScreen = False # players have come together
-        elif abs(player1.pos[0]-player2.pos[0]) > DISPLAY_WIDTH:
-            splitScreen = True # players moved apart
+        #if isSplitScreen and abs(cam1[0]-cam2[0]) <= DISPLAY_WIDTH:
+        if isSplitScreen and abs(player1.pos[0]+player1.image.get_width()-player2.pos[0]) <= DISPLAY_WIDTH/2:
+            isSplitScreen = False # players have come together
+            #cam1 = (cam1[0]-DISPLAY_WIDTH/2, cam1[1])
+        elif abs(player1.pos[0]+player1.image.get_width()-player2.pos[0]) > DISPLAY_WIDTH/2:
+            isSplitScreen = True # players moved apart
 
         # Render world to gameDisplay, at current camera position
         gameDisplay.fill(WHITE) # fill the background white to avoid smearing
-        if splitScreen:
+        if isSplitScreen: # show each player centered in own cam
             gameDisplay.blit(world, (0,0), pygame.Rect(cam1[0],cam1[1],int(DISPLAY_WIDTH/2),DISPLAY_HEIGHT))
             gameDisplay.blit(world, (DISPLAY_WIDTH/2,0), pygame.Rect(cam2[0],cam2[1],int(DISPLAY_WIDTH/2),DISPLAY_HEIGHT))
             pygame.draw.line(gameDisplay, BLACK, (int(DISPLAY_WIDTH/2), 0), (int(DISPLAY_WIDTH/2), DISPLAY_HEIGHT), 10)
-        else:
+        else: # show both players in wide cam, based on cam1 location
             gameDisplay.blit(world, (0,0), pygame.Rect(cam1[0],cam1[1],DISPLAY_WIDTH,DISPLAY_HEIGHT))
         
         # draw_text_box(gameDisplay, "camera: "+str(camera), FONT_ARIAL, BLACK, False, (int(DISPLAY_WIDTH/2), 20))
