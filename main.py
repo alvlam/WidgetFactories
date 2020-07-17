@@ -2,6 +2,19 @@ import sys
 from os import path
 import pygame as pg
 
+SINGLE_PLAYER = True # TO DO: make this selectable via menu
+
+p1_map = {
+        pg.K_a: ("move", (-1, 0)),
+        pg.K_d: ("move", (1, 0)),
+        pg.K_w: ("speed", 1),
+        pg.K_s: ("speed", -1)}
+p2_map = {
+        pg.K_LEFT: ("move", (-1, 0)),
+        pg.K_RIGHT: ("move", (1, 0)),
+        pg.K_UP: ("speed", 1),
+        pg.K_DOWN: ("speed", -1)}
+
 # Initialize pg
 pg.init()
 
@@ -30,7 +43,7 @@ def draw_text_box(surf, text, font, color, bold, loc):
 
 #------ Sprite definitions ------------------------------
 class Player(pg.sprite.Sprite):
-    def __init__(self, img, loc, camSize, speed=2, orientation="RIGHT", colour=None):
+    def __init__(self, img, loc, camSize, control_map, speed=2, orientation="RIGHT", colour=None):
         pg.sprite.Sprite.__init__(self)
         
         self.image = load_image_file(img)
@@ -46,18 +59,16 @@ class Player(pg.sprite.Sprite):
 
         self.orientation = "RIGHT" # source image is facing right
         self.setDirection(orientation)
-
         self.rect.center = (loc[0], loc[1]-self.rect.height) # centery off the ground
-        
         self.pos = pg.math.Vector2(self.rect.center)
         self.setTarget(self.pos)
         self.speed = speed
-    
+        self.controls = control_map
         self.autoMoving = False
 
         # split screen camera
         self.cam = pg.Rect(0, 0, camSize[0], camSize[1])
-        self.update() # center cam on player position, adjusting for edges
+        self.updateCam() # center cam on player position, adjusting for edges
 
     def setDirection(self, direction):
         if direction.upper() == "LEFT":
@@ -94,7 +105,16 @@ class Player(pg.sprite.Sprite):
         elif delta > 0 and self.speed <= 10: # change to MAX_SPEED
             self.speed += delta
         
-    def update(self):
+    def update(self, keys):
+
+        for control in self.controls:
+            if keys[control]:
+                if self.controls[control][0] == "move":
+                    #self.rect.move_ip(self.controls[control][1])
+                    self.move(self.controls[control][1])
+                if self.controls[control][0] == "speed":
+                    self.changeSpeed(self.controls[control][1])
+
         vector = self.target - self.pos
         move_length = vector.length()
 
@@ -110,7 +130,10 @@ class Player(pg.sprite.Sprite):
 
         self.rect.topleft = list(int(v) for v in self.pos)
 
-        # update player camera
+        self.updateCam()
+
+    # update player camera
+    def updateCam(self):
         self.cam.center = self.rect.center
         # adjust for edges
         self.cam.left = 0 if self.cam.left < 0 else self.cam.left
@@ -168,15 +191,22 @@ class Game(object):
         self.ground = self.worldSurface.get_height() - 100 # ground height
 
         # Set up players (with personal camera)
-        truck_filename = "truck64px.png"
-        self.isSplitScreen = True
-        splitCamSize = (self.screenSize[0] // 2, self.screenSize[1])
-        self.player1 = Player(truck_filename, (50,self.ground), splitCamSize, colour=pg.Color('sienna2'))
-        self.player2 = Player(truck_filename, (WORLD_WIDTH - 100,self.ground), splitCamSize, 
-                        orientation="LEFT", colour=pg.Color('blue')) # player2 starts from right
-        # add to separate group for rendering
+        # separate group for rendering
         self.players = pg.sprite.Group()
-        self.players.add(self.player1, self.player2)
+
+        truck_filename = "truck64px.png"
+
+        if SINGLE_PLAYER:
+            self.isSplitScreen = False
+            self.player1 = Player(truck_filename, (50,self.ground), self.screenSize, p1_map, colour=pg.Color('sienna2'))
+            self.players.add(self.player1)
+        else:
+            self.isSplitScreen = True
+            splitCamSize = (self.screenSize[0] // 2, self.screenSize[1])
+            self.player1 = Player(truck_filename, (50,self.ground), splitCamSize, p1_map, colour=pg.Color('sienna2'))
+            self.player2 = Player(truck_filename, (WORLD_WIDTH - 100,self.ground), splitCamSize, p2_map,
+                        orientation="LEFT", colour=pg.Color('blue')) # player2 starts from right
+            self.players.add(self.player1, self.player2)
         
         # Set up buildings
         global IMG_FACTORY, IMG_SHOP
@@ -211,48 +241,22 @@ class Game(object):
         if keys[pg.K_ESCAPE] or keys[pg.K_q]:
             self.done = True
 
-        #self.player1.update(keys)
-
-        # player1: left and right to move
-        if keys[pg.K_a]: # left
-            self.player1.move((-1,0))
-        elif keys[pg.K_d]: # right
-            self.player1.move((1,0))
-
-        # player1: W and S to change speed
-        if keys[pg.K_w]:
-            self.player1.changeSpeed(1)
-        elif keys[pg.K_s]:
-            self.player1.changeSpeed(-1)
-
-        # player2: left and right to move
-        if keys[pg.K_LEFT]:
-            self.player2.move((-1,0))
-        elif keys[pg.K_RIGHT]:
-            self.player2.move((1,0))
-        
-        # player2: up and down to change speed
-        if keys[pg.K_UP]:
-            self.player2.changeSpeed(1)
-        elif keys[pg.K_DOWN]:
-            self.player2.changeSpeed(-1)
+        for p in self.players.sprites():
+            p.update(keys)
         
         # checking pressed mouse and move the player around
         #click = pg.mouse.get_pressed()
         #if click[0] == True: # evaluate left button
         #    player1.setTarget(pg.mouse.get_pos())
 
-        self.player1.update()
-        self.player2.update()
-
         # update split/joint screen
         #if isSplitScreen and (cam1[0]+self.screenSize[0]/2 >= cam2[0]):
-        if self.isSplitScreen and abs(self.player1.pos[0]+self.player1.image.get_width()/2-self.player2.pos[0]) <= self.screenSize[0]/2:
-            self.isSplitScreen = False # players have come together
-            #cam1 = (cam1[0]-self.screenSize[0]/2, cam1[1])
-        elif abs(self.player1.pos[0]+self.player1.image.get_width()/2-self.player2.pos[0]) > self.screenSize[0]/2:
-            self.isSplitScreen = True # players moved apart
-
+        if not SINGLE_PLAYER:
+            if self.isSplitScreen and abs(self.player1.pos[0]+self.player1.image.get_width()/2-self.player2.pos[0]) <= self.screenSize[0]/2:
+                self.isSplitScreen = False # players have come together
+                #cam1 = (cam1[0]-self.screenSize[0]/2, cam1[1])
+            elif abs(self.player1.pos[0]+self.player1.image.get_width()/2-self.player2.pos[0]) > self.screenSize[0]/2:
+                self.isSplitScreen = True # players moved apart
         
     def draw(self):
         # render world surface
@@ -274,12 +278,14 @@ class Game(object):
         p1_view = self.worldSurface.subsurface(self.player1.cam)
         self.screen.blit(p1_view, (0, 0))
         #pg.draw.rect(self.screen, pg.Color("darkgreen"), self.player1.screen_rect)
-        p2_view = self.worldSurface.subsurface(self.player2.cam)
-        self.screen.blit(p2_view, (self.screenSize[0] // 2,0))
-        #pg.draw.rect(self.screen, pg.Color("goldenrod"), self.player2.screen_rect)
-        if self.isSplitScreen:
-            pg.draw.line(self.screen, pg.Color("black"), (self.screenSize[0] // 2, 0),
-                    (self.screenSize[0] // 2, self.screenSize[1]), 2)
+        
+        if not SINGLE_PLAYER:
+            p2_view = self.worldSurface.subsurface(self.player2.cam)
+            self.screen.blit(p2_view, (self.screenSize[0] // 2,0))
+            #pg.draw.rect(self.screen, pg.Color("goldenrod"), self.player2.screen_rect)
+            if self.isSplitScreen:
+                pg.draw.line(self.screen, pg.Color("black"), (self.screenSize[0] // 2, 0),
+                        (self.screenSize[0] // 2, self.screenSize[1]), 2)
 
 
         # Render world to gameDisplay, at current camera position
@@ -300,7 +306,18 @@ class Game(object):
             self.update(dt)
             self.draw()
             pg.display.update()
-            
+
+# to be completed - select 1 or 2 player, press return to start
+class Menu(object):
+    def __init__(self, screenSize):
+        self.done = False
+        self.screenSize = screenSize
+        self.screen = pg.display.set_mode(screenSize)
+        pg.display.set_caption("Widget Factories!")
+        #self.clock = pg.time.Clock()
+        #self.fps = 60
+        self.bgColour = pg.Color("black")
+                    
 
 if __name__ in "__main__":
     game = Game((800, 400))
