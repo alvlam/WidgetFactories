@@ -1,221 +1,11 @@
 import sys
-from os import path
 import pygame as pg
+from functions import *
+from gameglobals import *
+from player import Player
+from building import Building
 
-#------ GLOBALS--------------------------------------------
-
-SINGLE_PLAYER = True # TO DO: make this selectable via menu
-
-p1_map = {
-        pg.K_a: ("move", (-1, 0)),
-        pg.K_d: ("move", (1, 0)),
-        pg.K_w: ("speed", 1),
-        pg.K_s: ("speed", -1),
-        pg.K_e: ("place", 0)}
-p2_map = {
-        pg.K_LEFT: ("move", (-1, 0)),
-        pg.K_RIGHT: ("move", (1, 0)),
-        pg.K_UP: ("speed", 1),
-        pg.K_DOWN: ("speed", -1),
-        pg.K_p: ("place", 0)}
-
-# Image file names 
-# Icons made by https://www.flaticon.com/authors/nhor-phai
-TRUCK_FILENAME = "truck64px.png"
-FACTORY_FILENAME = "factory512px.png"
-SHOP_FILENAME = "shop512px.png"
-
-# Initialize pg
-pg.init()
-
-# pre-load font - after pygame inits
-FONT_ARIAL = pg.font.SysFont('Arial', 18)
-
-#------ Function definitions ------------------------------
-
-# Function to load image file and optional resize
-def load_image_file(fileName, resize=None):
-    img = pg.image.load(path.join(path.dirname(__file__), fileName))
-    if resize is not None:
-        img = pg.transform.scale(img, resize)
-    return img
-
-# Function to draw a text box
-# based on https://stackoverflow.com/questions/60997970/how-to-add-a-text-speech-in-pg
-def draw_text_box(surf, text, font, color, bold, loc):
-    font.set_bold(bold)
-    textSurf = font.render(text, True, color, pg.Color('white')).convert_alpha()
-    textSize = textSurf.get_size()   
-    bubbleSurf = pg.Surface((textSize[0]*2, textSize[1]*2))
-    bubbleSurf.fill(pg.Color('white'))
-    bubbleRect = bubbleSurf.get_rect()
-    pg.draw.rect(bubbleSurf, color, bubbleRect, 3)
-    bubbleSurf.blit(textSurf, textSurf.get_rect(center = bubbleRect.center))
-    bubbleRect.center = loc
-    surf.blit(bubbleSurf, bubbleRect) # render to surf
-
-#------ Sprite definitions ------------------------------
-class Player(pg.sprite.Sprite):
-    def __init__(self, img, loc, camSize, control_map, speed=2, orientation="RIGHT", colour=None):
-        pg.sprite.Sprite.__init__(self)
-        
-        self.image = load_image_file(img)
-        self.rect = self.image.get_rect()
-
-        # trying colourisation via blend
-        if colour is not None:
-            colourImage = pg.Surface(self.image.get_size()).convert_alpha()
-            colourImage.fill(colour)
-            self.image.blit(colourImage, (0,0), special_flags = pg.BLEND_RGBA_MULT)
-
-        #self.mask = pg.mask.from_surface(self.image)
-
-        # message, for speech bubble
-        self.message = ""
-
-        # camera settings
-        self.orientation = "RIGHT" # source image is facing right
-        self.setDirection(orientation)
-        self.rect.center = (loc[0], loc[1]-self.rect.height) # centery off the ground
-        self.pos = pg.math.Vector2(self.rect.center)
-        self.setTarget(self.pos)
-        self.speed = speed
-        self.controls = control_map
-        self.autoMoving = False
-
-        # split screen camera
-        self.cam = pg.Rect(0, 0, camSize[0], camSize[1])
-        self.updateCam() # center cam on player position, adjusting for edges
-
-    def setDirection(self, direction):
-        if direction.upper() == "LEFT":
-            if self.orientation == "RIGHT":
-              self.image = pg.transform.flip(self.image, True, False)
-            self.orientation = "LEFT"
-        else:
-            if self.orientation == "LEFT":
-              self.image = pg.transform.flip(self.image, True, False)
-            self.orientation = "RIGHT"
-    
-    def setTarget(self, pos):
-        if pos[0] > 0 and pos[0] < (WORLD_WIDTH - self.image.get_width()): #and pos[1] > 0 and pos[1] < DISPLAY_HEIGHT:
-            # set orientation and flip image if necessary
-            if pos[0] < self.pos[0]:
-              self.setDirection("LEFT")
-            elif pos[0] > self.pos[0]:
-              self.setDirection("RIGHT")
-            self.target = pg.math.Vector2((pos[0], self.pos[1]))
-        else:
-            self.target = self.pos
-    
-    def move(self, vector):
-      # set orientation and flip image if necessary
-      if vector[0] < 0:
-        self.setDirection("LEFT")
-      else:
-        self.setDirection("RIGHT")
-      self.setTarget((self.rect.left+(vector[0]*self.speed),self.rect.top+(vector[1]*self.speed)))
-    
-    def changeSpeed(self, delta):
-        if delta < 0 and self.speed > 1:
-            self.speed += delta
-        elif delta > 0 and self.speed <= 10: # change to MAX_SPEED
-            self.speed += delta
-        
-    def update(self, keys):
-
-        self.message = "" # clear any previous message
-
-        for control in self.controls:
-            if keys[control]:
-                if self.controls[control][0] == "move":
-                    #self.rect.move_ip(self.controls[control][1])
-                    self.move(self.controls[control][1])
-                if self.controls[control][0] == "speed":
-                    self.changeSpeed(self.controls[control][1])
-                if self.controls[control][0] == "place":
-                    newBuilding = Building(FACTORY_FILENAME, (self.rect.centerx, GROUND))
-                    # check if there is room to place new factory
-                    if pg.sprite.spritecollide(newBuilding, BUILDINGS, False):
-                        self.message = "No room!"
-                    else:
-                        BUILDINGS.add(newBuilding)
-
-        vector = self.target - self.pos
-        move_length = vector.length()
-
-        if move_length < self.speed:
-            self.pos = self.target
-            self.autoMoving = False
-        elif move_length != 0:
-            vector.normalize_ip()
-            vector = vector * self.speed
-            self.pos += vector
-        else:
-            self.autoMoving = False
-
-        self.rect.topleft = list(int(v) for v in self.pos)
-
-        self.updateCam()
-
-    # update player camera
-    def updateCam(self):
-        self.cam.center = self.rect.center
-        # adjust for edges
-        self.cam.left = 0 if self.cam.left < 0 else self.cam.left
-        self.cam.top = 0 if self.cam.top < 0 else self.cam.top
-        self.cam.left = WORLD_WIDTH-self.cam.width if self.cam.right > WORLD_WIDTH else self.cam.left
-        self.cam.top = WORLD_HEIGHT-self.cam.height if self.cam.bottom > WORLD_HEIGHT else self.cam.top
-
-        #if split:
-        #    if (self.pos[0] + self.image.get_width()/2 >= (DISPLAY_WIDTH/4)) \
-        #        and (self.pos[0] + self.image.get_width()/2 <= (WORLD_WIDTH - DISPLAY_WIDTH/4)): # player is away from edges of world
-        #        return (int(self.pos[0] + self.image.get_width()/2 - DISPLAY_WIDTH/4), cam[1]) # keep camera centered on player
-        #    elif (self.pos[0] < (DISPLAY_WIDTH/4)): # is at left side of world
-        #        return (0,0)
-        #    else: # is at right side of world
-        #        return (WORLD_WIDTH - DISPLAY_WIDTH/2, cam[1])
-        #else: # not split
-        #    if (self.pos[0] + self.image.get_width()/2 >= (DISPLAY_WIDTH/4)) \
-        #        and (self.pos[0] + self.image.get_width()/2 <= (WORLD_WIDTH - 3*DISPLAY_WIDTH/4)): # player is away from edges of world
-        #        return (int(self.pos[0] + self.image.get_width()/2 - DISPLAY_WIDTH/4), cam[1]) # keep camera centered on player
-        #    elif (self.pos[0] < (DISPLAY_WIDTH/4)): # is at left side of world
-        #        return (0,0)
-        #    else: # is at right side of world
-        #        return (WORLD_WIDTH - DISPLAY_WIDTH, cam[1])
-
-    # draw text box above player
-    def say(self, text):
-        abovePlayer = (self.rect.center[0], self.rect.center[1]-100)
-        draw_text_box(WORLD_SURFACE, text, FONT_ARIAL, pg.Color('black'), False, abovePlayer)
-
-class Building(pg.sprite.Sprite):
-    def __init__(self, img, loc):
-        pg.sprite.Sprite.__init__(self)
-        self.image = load_image_file(img, (128,128))
-        self.rect = self.image.get_rect()
-        self.mask = pg.mask.from_surface(self.image)
-
-        location = (loc[0]- self.image.get_width()//2, loc[1] - self.image.get_height()) # centerx and place on the ground
-        self.rect.topleft = location
-    
-        # message, for speech bubble
-        self.message = ""
-
-    def update(self, players):
-        self.message = "" # clear any previous message
-
-        # Check if players have collided with buildings
-        for player in players:
-            if self.rect.colliderect(player):
-                self.message = 'Hello!'
-            else:
-                self.message = ""
-
-    # draw text box above building
-    def say(self, text):
-        aboveBuilding = (self.rect.center[0], self.rect.center[1]-100)
-        draw_text_box(WORLD_SURFACE, text, FONT_ARIAL, pg.Color('black'), False, aboveBuilding)
+# Initialize pg - in gameglobals
 
 class Game(object):
     def __init__(self, screenSize):
@@ -226,13 +16,6 @@ class Game(object):
         self.clock = pg.time.Clock()
         self.fps = 60
         self.bgColour = pg.Color("gray5")
-        
-        # Set up world surface, as globals for objects to access
-        global WORLD_WIDTH, WORLD_HEIGHT, WORLD_SURFACE, GROUND
-        WORLD_WIDTH = 2000
-        WORLD_HEIGHT = 400
-        WORLD_SURFACE = pg.Surface((WORLD_WIDTH, WORLD_HEIGHT))
-        GROUND = WORLD_SURFACE.get_height() - 100 # ground height
 
         # Set up players (with personal camera)
         # separate group for rendering
@@ -240,21 +23,17 @@ class Game(object):
 
         if SINGLE_PLAYER:
             self.isSplitScreen = False
-            self.player1 = Player(TRUCK_FILENAME, (50,GROUND), self.screenSize, p1_map, colour=pg.Color('sienna2'))
+            self.player1 = Player(TRUCK_FILENAME, (50,GROUND), self.screenSize, P1_MAP, colour=pg.Color('sienna2'))
             self.players.add(self.player1)
         else:
             self.isSplitScreen = True
             splitCamSize = (self.screenSize[0] // 2, self.screenSize[1])
-            self.player1 = Player(TRUCK_FILENAME, (50,GROUND), splitCamSize, p1_map, colour=pg.Color('sienna2'))
-            self.player2 = Player(TRUCK_FILENAME, (WORLD_WIDTH - 100,GROUND), splitCamSize, p2_map,
+            self.player1 = Player(TRUCK_FILENAME, (50,GROUND), splitCamSize, P1_MAP, colour=pg.Color('sienna2'))
+            self.player2 = Player(TRUCK_FILENAME, (WORLD_WIDTH - 100,GROUND), splitCamSize, P2_MAP,
                         orientation="LEFT", colour=pg.Color('blue')) # player2 starts from right
             self.players.add(self.player1, self.player2)
         
         
-        # Create buildings and add to global group, for rendering
-        global BUILDINGS
-        #self.buildings = pg.sprite.Group()
-        BUILDINGS = pg.sprite.Group()
 #        BUILDINGS.add(Building(SHOP_FILENAME, (600,GROUND)))
         BUILDINGS.add(Building(SHOP_FILENAME, (1200,GROUND)))
 
