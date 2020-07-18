@@ -2,21 +2,34 @@ import sys
 from os import path
 import pygame as pg
 
+#------ GLOBALS--------------------------------------------
+
 SINGLE_PLAYER = True # TO DO: make this selectable via menu
 
 p1_map = {
         pg.K_a: ("move", (-1, 0)),
         pg.K_d: ("move", (1, 0)),
         pg.K_w: ("speed", 1),
-        pg.K_s: ("speed", -1)}
+        pg.K_s: ("speed", -1),
+        pg.K_e: ("place", 0)}
 p2_map = {
         pg.K_LEFT: ("move", (-1, 0)),
         pg.K_RIGHT: ("move", (1, 0)),
         pg.K_UP: ("speed", 1),
-        pg.K_DOWN: ("speed", -1)}
+        pg.K_DOWN: ("speed", -1),
+        pg.K_p: ("place", 0)}
+
+# Image file names 
+# Icons made by https://www.flaticon.com/authors/nhor-phai
+TRUCK_FILENAME = "truck64px.png"
+FACTORY_FILENAME = "factory512px.png"
+SHOP_FILENAME = "shop512px.png"
 
 # Initialize pg
 pg.init()
+
+# pre-load font - after pygame inits
+FONT_ARIAL = pg.font.SysFont('Arial', 18)
 
 #------ Function definitions ------------------------------
 
@@ -57,6 +70,10 @@ class Player(pg.sprite.Sprite):
 
         #self.mask = pg.mask.from_surface(self.image)
 
+        # message, for speech bubble
+        self.message = ""
+
+        # camera settings
         self.orientation = "RIGHT" # source image is facing right
         self.setDirection(orientation)
         self.rect.center = (loc[0], loc[1]-self.rect.height) # centery off the ground
@@ -107,6 +124,8 @@ class Player(pg.sprite.Sprite):
         
     def update(self, keys):
 
+        self.message = "" # clear any previous message
+
         for control in self.controls:
             if keys[control]:
                 if self.controls[control][0] == "move":
@@ -114,6 +133,13 @@ class Player(pg.sprite.Sprite):
                     self.move(self.controls[control][1])
                 if self.controls[control][0] == "speed":
                     self.changeSpeed(self.controls[control][1])
+                if self.controls[control][0] == "place":
+                    newBuilding = Building(FACTORY_FILENAME, (self.rect.centerx, GROUND))
+                    # check if there is room to place new factory
+                    if pg.sprite.spritecollide(newBuilding, BUILDINGS, False):
+                        self.message = "No room!"
+                    else:
+                        BUILDINGS.add(newBuilding)
 
         vector = self.target - self.pos
         move_length = vector.length()
@@ -158,20 +184,38 @@ class Player(pg.sprite.Sprite):
         #    else: # is at right side of world
         #        return (WORLD_WIDTH - DISPLAY_WIDTH, cam[1])
 
+    # draw text box above player
+    def say(self, text):
+        abovePlayer = (self.rect.center[0], self.rect.center[1]-100)
+        draw_text_box(WORLD_SURFACE, text, FONT_ARIAL, pg.Color('black'), False, abovePlayer)
+
 class Building(pg.sprite.Sprite):
     def __init__(self, img, loc):
         pg.sprite.Sprite.__init__(self)
-        self.image = img
+        self.image = load_image_file(img, (128,128))
         self.rect = self.image.get_rect()
         self.mask = pg.mask.from_surface(self.image)
 
-        location = (loc[0], loc[1] - self.image.get_height()) # centery off the ground
+        location = (loc[0]- self.image.get_width()//2, loc[1] - self.image.get_height()) # centerx and place on the ground
         self.rect.topleft = location
     
+        # message, for speech bubble
+        self.message = ""
+
+    def update(self, players):
+        self.message = "" # clear any previous message
+
+        # Check if players have collided with buildings
+        for player in players:
+            if self.rect.colliderect(player):
+                self.message = 'Hello!'
+            else:
+                self.message = ""
+
     # draw text box above building
-    def say(self, text, surf):
+    def say(self, text):
         aboveBuilding = (self.rect.center[0], self.rect.center[1]-100)
-        draw_text_box(surf, text, FONT_ARIAL, pg.Color('black'), False, aboveBuilding)
+        draw_text_box(WORLD_SURFACE, text, FONT_ARIAL, pg.Color('black'), False, aboveBuilding)
 
 class Game(object):
     def __init__(self, screenSize):
@@ -183,47 +227,40 @@ class Game(object):
         self.fps = 60
         self.bgColour = pg.Color("gray5")
         
-        # Set up world surface
-        global WORLD_WIDTH, WORLD_HEIGHT # global for camera edge checks
+        # Set up world surface, as globals for objects to access
+        global WORLD_WIDTH, WORLD_HEIGHT, WORLD_SURFACE, GROUND
         WORLD_WIDTH = 2000
         WORLD_HEIGHT = 400
-        self.worldSurface = pg.Surface((WORLD_WIDTH, WORLD_HEIGHT))
-        self.ground = self.worldSurface.get_height() - 100 # ground height
+        WORLD_SURFACE = pg.Surface((WORLD_WIDTH, WORLD_HEIGHT))
+        GROUND = WORLD_SURFACE.get_height() - 100 # ground height
 
         # Set up players (with personal camera)
         # separate group for rendering
         self.players = pg.sprite.Group()
 
-        truck_filename = "truck64px.png"
-
         if SINGLE_PLAYER:
             self.isSplitScreen = False
-            self.player1 = Player(truck_filename, (50,self.ground), self.screenSize, p1_map, colour=pg.Color('sienna2'))
+            self.player1 = Player(TRUCK_FILENAME, (50,GROUND), self.screenSize, p1_map, colour=pg.Color('sienna2'))
             self.players.add(self.player1)
         else:
             self.isSplitScreen = True
             splitCamSize = (self.screenSize[0] // 2, self.screenSize[1])
-            self.player1 = Player(truck_filename, (50,self.ground), splitCamSize, p1_map, colour=pg.Color('sienna2'))
-            self.player2 = Player(truck_filename, (WORLD_WIDTH - 100,self.ground), splitCamSize, p2_map,
+            self.player1 = Player(TRUCK_FILENAME, (50,GROUND), splitCamSize, p1_map, colour=pg.Color('sienna2'))
+            self.player2 = Player(TRUCK_FILENAME, (WORLD_WIDTH - 100,GROUND), splitCamSize, p2_map,
                         orientation="LEFT", colour=pg.Color('blue')) # player2 starts from right
             self.players.add(self.player1, self.player2)
         
-        # Set up buildings
-        global IMG_FACTORY, IMG_SHOP
-        # Icons made by https://www.flaticon.com/authors/nhor-phai
-        IMG_FACTORY = load_image_file("factory512px.png", (128,128))
-        IMG_SHOP = load_image_file("shop512px.png", (128,128))
         
-        # Create buildings and add to group for rendering
-        self.buildings = pg.sprite.Group()
-        self.buildings.add(Building(IMG_FACTORY, (200,self.ground)))
-        self.buildings.add(Building(IMG_SHOP, (600,self.ground)))
-        self.buildings.add(Building(IMG_SHOP, (1200,self.ground)))
-        self.buildings.add(Building(IMG_FACTORY, (WORLD_WIDTH - IMG_FACTORY.get_width() - 200,self.ground)))
+        # Create buildings and add to global group, for rendering
+        global BUILDINGS
+        #self.buildings = pg.sprite.Group()
+        BUILDINGS = pg.sprite.Group()
+#        BUILDINGS.add(Building(SHOP_FILENAME, (600,GROUND)))
+        BUILDINGS.add(Building(SHOP_FILENAME, (1200,GROUND)))
 
-        # pre-load font
-        global FONT_ARIAL
-        FONT_ARIAL = pg.font.SysFont('Arial', 18)
+#        self.buildings.add(Building(IMG_FACTORY, (200,GROUND)))
+#        self.buildings.add(Building(IMG_FACTORY, (WORLD_WIDTH - IMG_FACTORY.get_width() - 200,GROUND)))
+
     
     # Run Main Loop
     def event_loop(self):
@@ -238,7 +275,7 @@ class Game(object):
         keys = pg.key.get_pressed()
 
         # q or escape to quit
-        if keys[pg.K_ESCAPE] or keys[pg.K_q]:
+        if keys[pg.K_ESCAPE]:
             self.done = True
 
         for p in self.players.sprites():
@@ -258,29 +295,34 @@ class Game(object):
             elif abs(self.player1.pos[0]+self.player1.image.get_width()/2-self.player2.pos[0]) > self.screenSize[0]/2:
                 self.isSplitScreen = True # players moved apart
         
+        for b in BUILDINGS:
+            b.update(self.players)
+
     def draw(self):
         # render world surface
-        self.worldSurface.fill(pg.Color("skyblue")) # fill to stop smearing
-        pg.draw.rect(self.worldSurface, pg.Color('darkgreen'), (0, self.ground, WORLD_WIDTH, WORLD_HEIGHT)) # grass
-        pg.draw.line(self.worldSurface, pg.Color('black'), (0, self.ground), (WORLD_WIDTH, self.ground), 5) # draw the ground floor
-        self.buildings.draw(self.worldSurface)
-        self.players.draw(self.worldSurface)
+        WORLD_SURFACE.fill(pg.Color("skyblue")) # fill to stop smearing
+        pg.draw.rect(WORLD_SURFACE, pg.Color('darkgreen'), (0, GROUND, WORLD_WIDTH, WORLD_HEIGHT)) # grass
+        pg.draw.line(WORLD_SURFACE, pg.Color('black'), (0, GROUND), (WORLD_WIDTH, GROUND), 5) # draw the ground floor
+        BUILDINGS.draw(WORLD_SURFACE)
+        self.players.draw(WORLD_SURFACE)
 
-        # Check if players have collided with buildings
-        for player in self.players:
-            collided_buildings = pg.sprite.spritecollide(player, self.buildings, False)
-            for building in collided_buildings:
-                # If so, then factory should say hello
-                building.say('Hello!', self.worldSurface)
+        # display speech bubbles for any messages
+        for b in BUILDINGS:
+            if b.message != "":
+                b.say(b.message)
+        
+        for p in self.players:
+            if p.message != "":
+                p.say(p.message)
 
         # render player cameras
         self.screen.fill(self.bgColour)
-        p1_view = self.worldSurface.subsurface(self.player1.cam)
+        p1_view = WORLD_SURFACE.subsurface(self.player1.cam)
         self.screen.blit(p1_view, (0, 0))
         #pg.draw.rect(self.screen, pg.Color("darkgreen"), self.player1.screen_rect)
         
         if not SINGLE_PLAYER:
-            p2_view = self.worldSurface.subsurface(self.player2.cam)
+            p2_view = WORLD_SURFACE.subsurface(self.player2.cam)
             self.screen.blit(p2_view, (self.screenSize[0] // 2,0))
             #pg.draw.rect(self.screen, pg.Color("goldenrod"), self.player2.screen_rect)
             if self.isSplitScreen:
@@ -319,7 +361,7 @@ class Menu(object):
         self.bgColour = pg.Color("black")
                     
 
-if __name__ in "__main__":
+if __name__ in "__main__":    
     game = Game((800, 400))
     game.run()
     pg.quit()
