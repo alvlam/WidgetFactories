@@ -21,6 +21,10 @@ P2_MAP = {
         pg.K_DOWN: ("speed", -1),
         pg.K_p: ("place", 0)}
 
+# DISPLAY SIZE
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 400
+
 # Set up world surface, as globals for objects to access
 WORLD_WIDTH = 2000
 WORLD_HEIGHT = 400
@@ -33,5 +37,6 @@ TRUCK_FILENAME = "truck64px.png"
 FACTORY_FILENAME = "factory512px.png"
 SHOP_FILENAME = "shop512px.png"
 
-# Create buildings and add to global group, for rendering
+# Create global sprite groups
 BUILDINGS = pg.sprite.Group()
+ALL_SPRITES = pg.sprite.LayeredUpdates()

@@ -5,9 +5,9 @@ from building import Building
 
 class Player(pg.sprite.Sprite):
     def __init__(self, img, loc, camSize, control_map, speed=2, orientation="RIGHT", colour=None):
-        pg.sprite.Sprite.__init__(self)
+        super(Player, self).__init__()
         
-        self.image = fn.load_image_file(img)
+        self.image = (fn.load_image_file(img)).convert_alpha()
         self.rect = self.image.get_rect()
 
         # trying colourisation via blend
@@ -88,6 +88,7 @@ class Player(pg.sprite.Sprite):
                         self.message = "No room!"
                     else:
                         BUILDINGS.add(newBuilding)
+                        ALL_SPRITES.add(newBuilding, layer=1) # buildings = layer 1
 
         vector = self.target - self.pos
         move_length = vector.length()

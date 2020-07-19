@@ -4,7 +4,7 @@ from gameglobals import *
 
 # Function to load image file and optional resize
 def load_image_file(fileName, resize=None):
-    img = pg.image.load(path.join(path.dirname(__file__), fileName))
+    img = pg.image.load(path.join(path.dirname(__file__), fileName))#.convert()
     if resize is not None:
         img = pg.transform.scale(img, resize)
     return img

@@ -4,8 +4,9 @@ from gameglobals import *
 
 class Building(pg.sprite.Sprite):
     def __init__(self, img, loc):
-        pg.sprite.Sprite.__init__(self)
-        self.image = fn.load_image_file(img, (128,128))
+        super(Building, self).__init__()
+        
+        self.image = (fn.load_image_file(img, (128,128))).convert_alpha()
         self.rect = self.image.get_rect()
         self.mask = pg.mask.from_surface(self.image)
 
